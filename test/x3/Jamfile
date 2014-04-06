@@ -161,6 +161,13 @@ rule compile-fail ( sources + : requirements * : target-name ? )
     #~ ;
 
     #~ ###########################################################################
+    #~ test-suite spirit_v3/qi/x3_extensions :
+
+    test-suite spirit_v3/qi/x3_extensions :
+     [ run keywords.cpp       : : : : x3_keywords ]
+     ;
+     
+    #~ ###########################################################################
     #~ test-suite spirit_v3/karma :
 
      #~ [ compile-fail karma/grammar_fail.cpp         : : karma_grammar_fail ]

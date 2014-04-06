@@ -56,6 +56,11 @@ namespace boost { namespace spirit { namespace x3
             return *static_cast<Derived const*>(this);
         }
 
+        Derived const* derived_ptr() const
+        {
+            return static_cast<Derived const*>(this);
+        }
+
         template <typename Action>
         action<Derived, Action>
         operator[](Action f) const

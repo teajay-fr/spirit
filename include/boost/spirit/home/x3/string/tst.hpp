@@ -91,6 +91,11 @@ namespace boost { namespace spirit { namespace x3
             node::for_each(root, std::basic_string<Char>(), f);
         }
 
+        bool empty() const
+        {
+            return root == 0;
+        }
+
     private:
 
         friend struct detail::tst_node<Char, T>;
