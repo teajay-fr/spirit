@@ -12,10 +12,6 @@
 #include <boost/spirit/home/x3.hpp>
 #include <boost/fusion/include/vector.hpp>
 #include <boost/fusion/include/at.hpp>
-//~ #include <boost/phoenix/core.hpp>
-//~ #include <boost/phoenix/operator.hpp>
-//~ #include <boost/phoenix/object.hpp>
-//~ #include <boost/phoenix/bind.hpp>
 //~ #include <boost/fusion/include/std_pair.hpp>
 
 #include <string>
@@ -25,11 +21,11 @@
 
 namespace x3 = boost::spirit::x3;
 
-struct my_rule;
+typedef x3::identity<class my_rule> my_rule_id;
 
 template <typename Iterator, typename Exception, typename Context>
 x3::error_handler_result
-on_error(x3::identity<my_rule>, Iterator&, Exception const& x, Context const& context)
+on_error(my_rule_id, Iterator&, Exception const& x, Context const& context)
 {
     std::cout
         << "Error! Expecting: "
@@ -39,7 +35,16 @@ on_error(x3::identity<my_rule>, Iterator&, Exception const& x, Context const& co
         << "\""
         << std::endl
         ;
-    return x3::fail;
+    return x3::error_handler_result::fail;
+}
+
+int got_it = 0;
+
+template <typename Iterator, typename Attribute, typename Context>
+inline void
+on_success(my_rule_id, Iterator const&, Iterator const&, Attribute&, Context const&)
+{
+    ++got_it;
 }
 
 int
@@ -53,30 +58,27 @@ main()
     using boost::spirit::x3::rule;
     using boost::spirit::x3::int_;
     //~ using boost::spirit::x3::uint_;
-    //~ using boost::spirit::x3::fail;
-    //~ using boost::spirit::x3::on_error;
-    //~ using boost::spirit::x3::debug;
     using boost::spirit::x3::lit;
 
     //~ namespace phx = boost::phoenix;
 
-    // $$$ Maybe no longer relevant $$$
-    //~ { // show that ra = rb and ra %= rb works as expected
-        //~ rule<char const*, int() > ra, rb;
-        //~ int attr;
+    { // show that ra = rb and ra %= rb works as expected
+        rule<class a, int> ra;
+        rule<class b, int> rb;
+        int attr;
 
-        //~ ra %= int_;
-        //~ BOOST_TEST(test_attr("123", ra, attr));
-        //~ BOOST_TEST(attr == 123);
+        auto ra_def = (ra %= int_);
+        BOOST_TEST(test_attr("123", ra_def, attr));
+        BOOST_TEST(attr == 123);
 
-        //~ rb %= ra;
-        //~ BOOST_TEST(test_attr("123", rb, attr));
-        //~ BOOST_TEST(attr == 123);
+        auto rb_def = (rb %= ra_def);
+        BOOST_TEST(test_attr("123", rb_def, attr));
+        BOOST_TEST(attr == 123);
 
-        //~ rb = ra;
-        //~ BOOST_TEST(test_attr("123", rb, attr));
-        //~ BOOST_TEST(attr == 123);
-    //~ }
+        auto rb_def2 = (rb = ra_def);
+        BOOST_TEST(test_attr("123", rb_def2, attr));
+        BOOST_TEST(attr == 123);
+    }
 
 
     { // std::string as container attribute with auto rules
@@ -101,7 +103,7 @@ main()
 
     { // error handling
 
-        auto r = rule<my_rule, char const*>()
+        auto r = rule<my_rule_id, char const*>()
             = '(' > int_ > ',' > int_ > ')';
 
         BOOST_TEST(test("(123,456)", r));
@@ -109,6 +111,8 @@ main()
         BOOST_TEST(!test("(123,456]", r));
         BOOST_TEST(!test("(123;456)", r));
         BOOST_TEST(!test("[123,456]", r));
+
+        BOOST_TEST(got_it == 1);
     }
 
     // $$$ No longer relevant $$$
@@ -227,4 +231,3 @@ main()
 
     return boost::report_errors();
 }
-

@@ -24,9 +24,11 @@ namespace boost { namespace spirit { namespace x3
 {
     template <typename ID>
     struct rule_context_with_id_tag;
-    
+
     template <typename ID>
     struct identity;
+
+    struct parse_pass_context_tag;
 
 }}}
 
@@ -84,14 +86,59 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
     struct no_exception_handler {};
 
     template <typename ID, typename Iterator, typename Exception, typename Context>
-    inline no_exception_handler on_error(ID, Iterator&, Exception const&, Context const&)
+    inline no_exception_handler
+    on_error(ID, Iterator&, Exception const&, Context const&)
     {
         return no_exception_handler();
     }
 
+    template <typename ID, typename Iterator, typename Attribute, typename Context>
+    inline void
+    on_success(ID, Iterator const&, Iterator const&, Attribute&, Context const&)
+    {
+        // no-op
+    }
+
+    template <typename ID>
+    struct make_id
+    {
+        typedef identity<ID> type;
+    };
+
+    template <typename ID>
+    struct make_id<identity<ID>>
+    {
+        typedef identity<ID> type;
+    };
+
     template <typename Attribute, typename ID>
     struct parse_rule
     {
+        template <typename RHS, typename Iterator, typename Context, typename ActualAttribute>
+        static bool parse_rhs_main(
+            RHS const& rhs
+          , Iterator& first, Iterator const& last
+          , Context const& context, ActualAttribute& attr, mpl::true_)
+        {
+            Iterator i = first;
+            bool r = rhs.parse(i, last, context, attr);
+            if (r)
+            {
+                bool pass = true;
+                auto action_context = make_context<parse_pass_context_tag>(pass, context);
+                on_success(
+                    typename make_id<ID>::type()
+                  , first
+                  , i
+                  , attr
+                  , action_context
+                );
+                if (pass)
+                    first = i;
+            }
+            return r;
+        }
+
         template <typename RHS, typename Iterator, typename Context, typename ActualAttribute>
         static bool parse_rhs_main(
             RHS const& rhs
@@ -102,36 +149,23 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
             {
                 try
                 {
-                    Iterator i = first;
-                    bool r = rhs.parse(i, last, context, attr);
-                    if (r)
-                        first = i;
-                    return r;
+                    return parse_rhs_main(rhs, first, last, context, attr, mpl::true_());
                 }
                 catch (expectation_failure<Iterator> const& x)
                 {
-                    switch (on_error(identity<ID>(), first, x, context))
+                    switch (on_error(typename make_id<ID>::type(), first, x, context))
                     {
-                        case fail:
+                        case error_handler_result::fail:
                             return false;
-                        case retry:
+                        case error_handler_result::retry:
                             continue;
-                        case accept:
+                        case error_handler_result::accept:
                             return true;
-                        case rethrow:
+                        case error_handler_result::rethrow:
                             throw;
                     }
                 }
             }
-        }
-
-        template <typename RHS, typename Iterator, typename Context, typename ActualAttribute>
-        static bool parse_rhs_main(
-            RHS const& rhs
-          , Iterator& first, Iterator const& last
-          , Context const& context, ActualAttribute& attr, mpl::true_)
-        {
-            return rhs.parse(first, last, context, attr);
         }
 
         template <typename RHS, typename Iterator, typename Context, typename ActualAttribute>
@@ -143,7 +177,7 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
             typedef
                 decltype(
                     on_error(
-                        identity<ID>()
+                        typename make_id<ID>::type()
                       , first
                       , boost::declval<expectation_failure<Iterator> const&>()
                       , context
@@ -177,23 +211,15 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
             return parse_rhs_main(rhs, first, last, context, unused);
         }
 
-        template <typename RHS, typename Iterator, typename Context, typename ActualAttribute>
-        static bool parse_rhs(
-            RHS const& rhs
-          , Iterator& first, Iterator const& last
-          , Context const& context, ActualAttribute& attr)
-        {
-            return parse_rhs(rhs, first, last, context, attr
-              , mpl::bool_<(RHS::has_action)>());
-        }
-
         template <typename RHS, typename Iterator, typename Context
-            , typename ActualAttribute, typename AttributePtr>
+            , typename ActualAttribute, typename AttributePtr
+            , typename ExplicitAttrPropagation>
         static bool call_rule_definition(
             RHS const& rhs
           , char const* rule_name
           , Iterator& first, Iterator const& last
-          , Context const& context, ActualAttribute& attr, AttributePtr*& attr_ptr)
+          , Context const& context, ActualAttribute& attr
+          , AttributePtr*& attr_ptr, ExplicitAttrPropagation)
         {
             typedef traits::make_attribute<Attribute, ActualAttribute> make_attribute;
 
@@ -214,7 +240,9 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
 #endif
             attr_pointer_scope<typename remove_reference<transform_attr>::type>
                 attr_scope(attr_ptr, boost::addressof(attr_));
-            if (parse_rhs(rhs, first, last, context, attr_))
+
+            if (parse_rhs(rhs, first, last, context, attr_
+              , mpl::bool_<(RHS::has_action && !ExplicitAttrPropagation::value)>()))
             {
                 // do up-stream transformation, this integrates the results
                 // back into the original attribute value, if appropriate
@@ -243,7 +271,8 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
 
             return call_rule_definition(
                 rule_def.rhs, rule_name, first, last
-              , context, attr, attr_ctx.attr_ptr);
+              , context, attr, attr_ctx.attr_ptr
+              , mpl::bool_<(RuleDef::explicit_attribute_propagation)>());
         }
 
         template <typename RuleDef, typename Iterator, typename Context
