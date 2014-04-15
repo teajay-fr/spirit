@@ -6,13 +6,12 @@
     Distributed under the Boost Software License, Version 1.0. (See accompanying
     file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 ==============================================================================*/
-#if !defined(BOOST_SPIRIT_X3_EXTENSIONS_DIRECTIVE_APRIL_13_2014_1919PM)
-#define BOOST_SPIRIT_X3_EXTENSIONS_DIRECTIVE_APRIL_13_2014_1919PM 
+#if !defined(BOOST_SPIRIT_X3_EXTENSIONS_OPERATOR_APRIL_15_2014_1533PM)
+#define BOOST_SPIRIT_X3_EXTENSIONS_OPERATOR_APRIL_15_2014_1533PM 
 
 #if defined(_MSC_VER)
 #pragma once
 #endif
 
-#include <boost/spirit/home/x3/extensions/directive/seek.hpp>
-#include <boost/spirit/home/x3/extensions/directive/keyword.hpp>
+#include <boost/spirit/home/x3/extensions/operator/keyword.hpp>
 #endif
