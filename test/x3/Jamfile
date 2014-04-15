@@ -112,7 +112,6 @@ rule compile-fail ( sources + : requirements * : target-name ? )
      [ run real3.cpp            : : : : x3_real3 ]
      [ run real4.cpp            : : : : x3_real4 ]
      # [ run real5.cpp            : : : : x3_real5 ]
-     # [ run repeat.cpp           : : : : x3_repeat ]
      [ run rule1.cpp            : : : : x3_rule1 ]
      [ run rule2.cpp            : : : : x3_rule2 ]
      [ run rule3.cpp            : : : : x3_rule3 ]
@@ -176,6 +175,7 @@ rule compile-fail ( sources + : requirements * : target-name ? )
 
     test-suite spirit_v3/qi/x3_extensions :
      [ run keywords.cpp       : : : : x3_keywords ]
+     [ run repeat.cpp         : : : : x3_repeat ]
      ;
      
     #~ ###########################################################################
