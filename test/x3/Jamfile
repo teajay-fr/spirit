@@ -160,6 +160,17 @@ rule compile-fail ( sources + : requirements * : target-name ? )
      #~ [ run regression_binary_action.cpp                        : : : : x3_regression_binary_action ]
     #~ ;
 
+    #~ test-suite spirit_v3/qi/x3_extensions :
+    test-suite spirit_v3/qi/x3_extensions :
+
+     [ run extensions/seek.cpp       : : : : x3_seek ]
+
+     ;
+
+     
+
+    #~ ###########################################################################
+
     #~ ###########################################################################
     #~ test-suite spirit_v3/qi/x3_extensions :
 
