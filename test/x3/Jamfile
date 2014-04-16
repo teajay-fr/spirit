@@ -17,7 +17,7 @@ import feature ;
 project spirit_test
     : requirements
         <include>.
-        <toolset>gcc:<cxxflags>-std=c++0x
+        <toolset>gcc:<cxxflags>-std=c++1y
         <toolset>gcc:<cxxflags>-ftemplate-depth-512
         <toolset>clang:<cxxflags>-std=c++1y
         <toolset>clang:<cxxflags>-ftemplate-depth-512
@@ -159,23 +159,15 @@ rule compile-fail ( sources + : requirements * : target-name ? )
      #~ [ run regression_binary_action.cpp                        : : : : x3_regression_binary_action ]
     #~ ;
 
-    #~ test-suite spirit_v3/qi/x3_extensions :
-    test-suite spirit_v3/qi/x3_extensions :
+    #~ ###########################################################################
 
+    #~ ###########################################################################
+    #~ test-suite spirit_v3/qi/x3_extensions :
+
+    test-suite spirit_v3/qi/x3_extensions :
      [ run extensions/seek.cpp       : : : : x3_seek ]
-
-     ;
-
-     
-
-    #~ ###########################################################################
-
-    #~ ###########################################################################
-    #~ test-suite spirit_v3/qi/x3_extensions :
-
-    test-suite spirit_v3/qi/x3_extensions :
      [ run keywords.cpp       : : : : x3_keywords ]
-     [ run repeat.cpp         : : : : x3_repeat ]
+     [ run extensions/repeat.cpp     : : : : x3_repeat ]
      ;
      
     #~ ###########################################################################

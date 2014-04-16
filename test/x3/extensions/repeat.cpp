@@ -11,33 +11,10 @@
 #include <boost/utility/enable_if.hpp>
 
 #include <boost/spirit/home/x3.hpp>
-
+#include <boost/spirit/home/x3/extensions.hpp>
 #include <string>
 #include <iostream>
 #include "test.hpp"
-
-struct x_attr
-{
-};
-
-namespace boost { namespace spirit { namespace traits 
-{
-    template <>
-    struct container_value<x_attr>
-    {
-        typedef char type; // value type of container
-    };
-
-    template <>
-    struct push_back_container<x_attr, char>
-    {
-        static bool call(x_attr& /*c*/, char /*val*/)
-        {
-            // push back value type into container
-            return true;
-        }
-    };
-}}}
 
 int
 main()
@@ -45,19 +22,17 @@ main()
     using spirit_test::test_attr;
     using spirit_test::test;
 
-    using namespace boost::spirit::ascii;
-    using boost::spirit::qi::repeat;
-    using boost::spirit::qi::inf;
-    using boost::spirit::qi::omit;
-    using boost::spirit::qi::int_;
-    using boost::spirit::qi::_1;
-    using boost::spirit::qi::lexeme;
-
+    using namespace boost::spirit::x3::ascii;
+    using boost::spirit::x3::repeat;
+    using boost::spirit::x3::inf;
+    using boost::spirit::x3::omit;
+    using boost::spirit::x3::int_;
+    using boost::spirit::x3::lexeme;
+    using boost::spirit::x3::char_;
     {
         BOOST_TEST(test("aaaaaaaa", repeat[char_])); // kleene synonym
         BOOST_TEST(test("aaaaaaaa", repeat(8)[char_]));
         BOOST_TEST(!test("aa", repeat(3)[char_]));
-
         BOOST_TEST(test("aaa", repeat(3, 5)[char_]));
         BOOST_TEST(test("aaaaa", repeat(3, 5)[char_]));
         BOOST_TEST(!test("aaaaaa", repeat(3, 5)[char_]));
@@ -68,7 +43,6 @@ main()
         BOOST_TEST(test("aaaaaa", repeat(3, inf)[char_]));
         BOOST_TEST(!test("aa", repeat(3, inf)[char_]));
     }
-
     {
         std::string s;
         BOOST_TEST(test_attr("aaaaaaaa", repeat[char_ >> char_], s)); // kleene synonym
@@ -149,18 +123,18 @@ main()
         BOOST_TEST(test(" a a aaa aa", repeat(7)[char_], space));
         BOOST_TEST(test("12345 678 9", repeat(9)[digit], space));
     }
-
+#if 0
     {
         BOOST_TEST(test("aBcdeFGH", no_case[repeat(8)[lower]]));
         BOOST_TEST(test("a B cde FGH", no_case[repeat(8)[lower]], space));
     }
-
+#endif
     {
         std::vector<std::string> v;
         BOOST_TEST(test_attr("a b c d", repeat(4)[lexeme[+alpha]], v, space) && 4 == v.size() &&
             v[0] == "a" && v[1] == "b" && v[2] == "c" &&  v[3] == "d");
     }
-    
+#if 0 
     {
         std::string s;
         BOOST_TEST(test_attr("bbbb", repeat(4)[char_], s) && s == "bbbb");
@@ -175,7 +149,7 @@ main()
         s.clear();
         BOOST_TEST(test_attr("b b b b", omit[repeat(4)[char_('b')]], s, space) && s == "bbbb");
     }
-
+#endif
     {
         BOOST_TEST(test("1 2 3", int_ >> repeat(2)[int_], space));
         BOOST_TEST(!test("1 2", int_ >> repeat(2)[int_], space));
@@ -189,14 +163,12 @@ main()
         BOOST_TEST(!test("1 2", int_ >> repeat(2)[int_], space));
     }
 
+#if 0
     { // actions
-        namespace phx = boost::phoenix;
-
         std::vector<char> v;
-        BOOST_TEST(test("bbbb", repeat(4)[char_][phx::ref(v) = _1]) && 4 == v.size() &&
+        BOOST_TEST(test("bbbb", repeat(4)[char_]/ [&v]( auto &ctx, const std::vector<char> &attr) { v = attr; }) && 4 == v.size() &&
             v[0] == 'b' && v[1] == 'b' && v[2] == 'b' &&  v[3] == 'b');
     }
-
     { // more actions
         namespace phx = boost::phoenix;
 
@@ -245,7 +217,7 @@ main()
         test_attr("abcde", repeat(1, 5)[char_], x);
         test_attr("abcde", repeat(1, inf)[char_], x);
     }
-
+#endif
     return boost::report_errors();
 }
 
