@@ -25,7 +25,6 @@
 
 namespace boost { namespace spirit { namespace x3
 {
-    template <typename Left, typename Right> struct keyword_parser;
 
     template <typename String, typename Encoding,
         typename Attribute = std::basic_string<typename Encoding::char_type>>
@@ -50,20 +49,6 @@ namespace boost { namespace spirit { namespace x3
             return detail::string_parse(str, first, last, attr);
         }
 
-        template <typename Subject>
-        keyword_parser< literal_string< String, Encoding, Attribute>
-                        , typename extension::as_parser<Subject>::value_type >
-            operator->*(Subject const& subject) const
-        {
-/*          typedef
-              keyword_parser< this_type
-                            , typename extension::as_parser<Subject>::value_type >
-          result_type;
-*/
-          return {*this,as_parser(subject)};
-
-        }
- 
         String str;
     };
 

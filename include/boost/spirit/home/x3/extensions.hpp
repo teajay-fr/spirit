@@ -14,5 +14,4 @@
 #endif
 
 #include <boost/spirit/home/x3/extensions/directive.hpp>
-#include <boost/spirit/home/x3/extensions/operator.hpp>
 #endif
