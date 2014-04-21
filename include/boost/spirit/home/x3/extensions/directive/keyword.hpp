@@ -21,11 +21,9 @@
 
 #include <boost/spirit/home/x3/string/symbols.hpp>
 
-#include <boost/type_traits/is_same.hpp>
-#include <boost/type_traits/add_reference.hpp>
 #include <string>
 
-namespace boost { namespace spirit { namespace x3 { namespace helper {
+namespace boost { namespace spirit { namespace x3 { namespace detail {
     template <int... Is>
     struct parser_index {};
 
@@ -35,16 +33,51 @@ namespace boost { namespace spirit { namespace x3 { namespace helper {
     template <int... Is>
     struct gen_parser_seq<0, Is...> : parser_index<Is...> {};
 
-    template <typename Context, typename Keywords, int... Is>
+    template <int... Is>
     struct attribute_index {};
 
-    template <typename Context, typename Keywords, int N, int ... Is>
-    struct gen_attribute_seq : gen_attribute_seq<Context, Keywords, N - 1, N - 1, Is...> {};
+    template <typename Context, typename Keywords, int AttrIdx,int ParserIdx, int N, int ... Is>
+    struct gen_attribute_seq;
 
-    template <typename Context, typename Keywords, int ... Is>
-    struct gen_attribute_seq<Context, Keywords, 0, Is...> : attribute_index<Context, Keywords, Is...> {};
+    template <typename Context, typename Keywords, int AttrIdx, int ParserIdx, int N, bool HasAttr, int ... Is>
+    struct gen_attribute_seq_detail : gen_attribute_seq< Context, Keywords, AttrIdx+1, ParserIdx +1, N-1, Is ..., AttrIdx> {};
 
+    template <typename Context, typename Keywords, int AttrIdx, int ParserIdx, int N, int ... Is>
+    struct gen_attribute_seq_detail<Context,Keywords,AttrIdx, ParserIdx, N, false, Is...> : gen_attribute_seq< Context, Keywords, AttrIdx, ParserIdx +1, N-1, Is..., -1 > {};
+    
+    template <typename Context, typename Keywords, int AttrIdx,int ParserIdx, int N, int ... Is>
+    struct gen_attribute_seq : 
+            gen_attribute_seq_detail<Context, Keywords, AttrIdx, ParserIdx, N, traits::has_attribute< typename std::tuple_element<ParserIdx, Keywords>::type, Context >::value, Is...> {};
 
+    template <typename Context, typename Keywords, int AttrIdx,int ParserIdx, int ... Is>
+    struct gen_attribute_seq<Context, Keywords, AttrIdx, ParserIdx, 0, Is...> : attribute_index<Is...> {};
+
+    template <int N, int... Is>
+    struct gen_unused_attribute_seq : gen_unused_attribute_seq<N - 1, - 1, Is...> {};
+
+    template <int... Is>
+    struct gen_unused_attribute_seq<0, Is...> : attribute_index<Is...> {};
+
+    template <typename Attribute, int Index>
+    struct get_attribute
+    {
+      typedef typename fusion::result_of::at_c<Attribute,Index>::type type;
+      static typename add_reference<type>::type call(Attribute &s)
+      {
+        return fusion::at_c<Index>(s);
+      }
+
+    };
+    
+    template <typename Attribute>
+    struct get_attribute<Attribute, -1 >
+   {
+     static unused_type& call(Attribute &s)
+     {
+       static unused_type result;
+       return result;
+     }
+   };
 
 }}}}
         
@@ -56,7 +89,7 @@ namespace boost { namespace spirit { namespace x3 {
      {
        typedef unary_parser<Subject, keyword_parser<Key,Subject> > base_type;
       
-       static const bool has_attribute = true;
+       static const bool is_pass_through_unary =true;
 
        keyword_parser(Key const &key, Subject const& subject)
          : base_type(subject)
@@ -121,6 +154,8 @@ namespace boost { namespace spirit { namespace x3 {
              add_keywords(lookup,index+1,keywords ...);
      }
 
+    
+
      template <typename ...Keywords> 
      struct keywords_directive : parser< keywords_directive< Keywords ...> >
      {             
@@ -135,20 +170,21 @@ namespace boost { namespace spirit { namespace x3 {
                add_keywords(lookup,0,keywords...);
        }
 
-       template <int ParserIdx, int AttributeIdx, typename Iterator, typename Context, typename Attribute>
+       template <int ParserIdx, typename GetAttribute, typename Iterator, typename Context, typename Attribute>
                bool parse_subject(Iterator& first, Iterator const& last
                   , Context const& context, Attribute& attr) const
                {
-                       return std::get<ParserIdx>(keywords).parse(first,last,context,fusion::at_c<AttributeIdx>(attr));
+                       return std::get<ParserIdx>(keywords).subject.parse(first,last,context,GetAttribute::call(attr));
                }
+ 
        template <typename Iterator, typename Context, typename Attribute, int... Is, int... As>
        bool parse_internal(Iterator& first, Iterator const& last
-                  , Context const& context, Attribute& attr, helper::parser_index<Is...>, helper::attribute_index<Context, std::tuple<Keywords...>, As...> ) const
+                  , Context const& context, Attribute& attr, detail::parser_index<Is...>, detail::attribute_index<As...> ) const
        {
                typedef bool (keywords_directive::* subject_caller) (Iterator &, Iterator const&, Context const&, Attribute &) const;
                static subject_caller parse_functions[nb_keywords] =
                {
-                &keywords_directive::parse_subject<Is,As,Iterator,Context,Attribute>...
+                &keywords_directive::parse_subject<Is,detail::get_attribute<Attribute, As>,Iterator,Context,Attribute>...
                };
             x3::skip_over(first, last, context);
 
@@ -167,213 +203,17 @@ namespace boost { namespace spirit { namespace x3 {
        bool parse(Iterator& first, Iterator const& last
                   , Context const& context, Attribute& attr) const
        {
-               return parse_internal(first,last,context,attr,helper::parser_index<nb_keywords-1>{}, helper::attribute_index<Context,std::tuple<Keywords...>, nb_keywords -1>{});
+               return parse_internal(
+                               first,last,context,attr,
+                               detail::gen_parser_seq<nb_keywords>{},
+                                typename std::conditional< 
+                                        std::is_same< typename std::remove_const<Attribute>::type, unused_type >::value, 
+                                       detail::gen_unused_attribute_seq<nb_keywords>,
+                                       detail::gen_attribute_seq<Context,std::tuple<Keywords...>,0,0,nb_keywords> 
+                                       >::type{}
+                               );
        }
 
-#if 0
-       ///////////////////////////////////////////////////////////////////////////
-        // build_parser_tags
-        //
-        // Builds a boost::variant from an mpl::range_c in order to "mark" every
-        // parser of the fusion sequence. The integer constant is used in the parser
-        // dispatcher functor in order to use the parser corresponding to the recognised
-        // keyword.
-        ///////////////////////////////////////////////////////////////////////////
-
-        template <typename Sequence>
-        struct build_parser_tags
-        {
-            // Get the sequence size
-            typedef typename mpl::size< Sequence >::type sequence_size;
-
-            // Create an integer_c constant for every parser in the sequence
-            typedef typename mpl::range_c<int, 0, sequence_size::value>::type int_range;
-
-            // Transform the range_c to an mpl vector in order to be able to transform it into a variant
-            typedef typename mpl::copy<int_range, mpl::back_inserter<mpl::vector<> > >::type type;
-
-        };
-
-        // Build an index mpl vector
-        typedef typename build_parser_tags< Elements >::type parser_index_vector;
-
-        // build a bool array and an integer array which will be used to
-        // check that the repetition constraints of the kwd parsers are
-        // met and bail out a soon as possible
-        typedef boost::array<bool, sizeof...keywords> flags_type;
-        typedef boost::array<int, sizeof...keywords> counters_type;
-
-
-       template <typename Iterator, typename Context, typename Attribute>
-       bool parse(Iterator& first, Iterator const& last
-                  , Context const& context, Attribute& attr) const
-       {
-
-            // Select which parse function to call
-            // We need to handle the case where kwd / ikwd directives have been mixed
-            // This is where we decide which function should be called.
-            return parse_impl(first, last, context, skipper, attr_, mpl::true_()
-//                                typename string_keywords_type::requires_one_pass()
-                             );
-       }
-
-        template <typename Iterator, typename Context
-          , typename Skipper, typename Attribute>
-        bool parse_impl(Iterator& first, Iterator const& last
-          , Context& context, Skipper const& skipper
-          , Attribute& attr_,mpl::true_ /* one pass */) const
-          {
-
-            // wrap the attribute in a tuple if it is not a tuple
-            typename traits::wrap_if_not_tuple<Attribute>::type attr(attr_);
-
-            flags_type flags(flags_init);
-            //flags.assign(false);
-
-            counters_type counters;
-            counters.assign(0);
-
-            typedef repository::qi::detail::parse_dispatcher<Elements,Iterator, Context, Skipper
-                                    , flags_type, counters_type
-                                    , typename traits::wrap_if_not_tuple<Attribute>::type
-                                    , mpl::false_ > parser_visitor_type;
-
-            parser_visitor_type parse_visitor(elements, first, last
-                                             , context, skipper, flags
-                                             , counters, attr);
-
-            typedef repository::qi::detail::complex_kwd_function< parser_visitor_type > complex_kwd_function_type;
-
-            complex_kwd_function_type
-                     complex_function(first,last,context,skipper,parse_visitor);
-
-            // We have a bool array 'flags' with one flag for each parser as well as a 'counter'
-            // array.
-            // The kwd directive sets and increments the counter when a successeful parse occured
-            // as well as the slot of the corresponding parser to true in the flags array as soon
-            // the minimum repetition requirement is met and keeps that value to true as long as
-            // the maximum repetition requirement is met.
-            // The parsing takes place here in two steps:
-            // 1) parse a keyword and fetch the parser index associated with that keyword
-            // 2) call the associated parser and store the parsed value in the matching attribute.
-
-            while(true)
-            {
-
-                spirit::qi::skip_over(first, last, skipper);
-                Iterator save = first;
-                if (string_keywords_inst.parse(first, last,parse_visitor,skipper))
-                {
-                    save = first;
-                }
-                else {
-                  // restore the position to the last successful keyword parse
-                  first = save;
-                  if(!complex_keywords_inst.parse(complex_function))
-                  {
-                    first = save;
-                    // Check that we are leaving the keywords parser in a successfull state
-                    BOOST_FOREACH(bool &valid,flags)
-                    {
-                      if(!valid)
-                      {
-                        return false;
-                      }
-                    }
-                    return true;
-                  }
-                  else
-                    save = first;
-                }
-            }
-            return false;
-          }
-
-        // Handle the mixed kwd and ikwd case
-        template <typename Iterator, typename Context
-          , typename Skipper, typename Attribute>
-        bool parse_impl(Iterator& first, Iterator const& last
-          , Context& context, Skipper const& skipper
-          , Attribute& attr_,mpl::false_ /* two passes */) const
-          {
-
-            // wrap the attribute in a tuple if it is not a tuple
-            typename traits::wrap_if_not_tuple<Attribute>::type attr(attr_);
-
-            flags_type flags(flags_init);
-            //flags.assign(false);
-
-            counters_type counters;
-            counters.assign(0);
-
-            typedef detail::parse_dispatcher<Elements, Iterator, Context, Skipper
-                                    , flags_type, counters_type
-                                    , typename traits::wrap_if_not_tuple<Attribute>::type
-                                    , mpl::false_> parser_visitor_type;
-
-           typedef detail::parse_dispatcher<Elements, Iterator, Context, Skipper
-                                    , flags_type, counters_type
-                                    , typename traits::wrap_if_not_tuple<Attribute>::type
-                                    , mpl::true_> no_case_parser_visitor_type;
-
-
-            parser_visitor_type parse_visitor(elements,first,last
-                                             ,context,skipper,flags,counters,attr);
-            no_case_parser_visitor_type no_case_parse_visitor(elements,first,last
-                                             ,context,skipper,flags,counters,attr);
-
-            typedef repository::qi::detail::complex_kwd_function< parser_visitor_type > complex_kwd_function_type;
-
-            complex_kwd_function_type
-                     complex_function(first,last,context,skipper,parse_visitor);
-
-
-            // We have a bool array 'flags' with one flag for each parser as well as a 'counter'
-            // array.
-            // The kwd directive sets and increments the counter when a successeful parse occured
-            // as well as the slot of the corresponding parser to true in the flags array as soon
-            // the minimum repetition requirement is met and keeps that value to true as long as
-            // the maximum repetition requirement is met.
-            // The parsing takes place here in two steps:
-            // 1) parse a keyword and fetch the parser index associated with that keyword
-            // 2) call the associated parser and store the parsed value in the matching attribute.
-
-            while(true)
-            {
-                spirit::qi::skip_over(first, last, skipper);
-                Iterator save = first;
-                // String keywords pass
-                if (string_keywords_inst.parse(first,last,parse_visitor,no_case_parse_visitor,skipper))
-                {
-                    save = first;
-                }
-                else {
-                  first = save;
-
-                  if(!complex_keywords_inst.parse(complex_function))
-                  {
-                    first = save;
-                    // Check that we are leaving the keywords parser in a successfull state
-                    BOOST_FOREACH(bool &valid,flags)
-                    {
-                      if(!valid)
-                      {
-                        return false;
-                      }
-                    }
-                    return true;
-                  }
-                  else
-                  {
-                    save = first;
-                  }
-                }
-            }
-            return false;
-          }
-#endif
-       //typedef typename make_variant_over< boost::mpl::int_<helper::gen_seq<sizeof...(Keywords)> >... >::type keyword_index;
-//       typedef std::tuple< boost::mpl::int_<helper::gen_seq<sizeof...(Keywords)> >... > keyword_index;
        tst<char, int> lookup;
        std::tuple<Keywords ...> keywords;
      }; 

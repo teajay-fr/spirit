@@ -65,12 +65,11 @@ main()
     using boost::spirit::x3::keywords;
 
   {
-      boost::fusion::vector<int,int> data;
-      BOOST_TEST( test_attr("b=2", keywords( kwd("c")['=' > int_], kwd("b")['='>int_]), data, space ));
+      boost::fusion::vector<int,int,int> data;
+      BOOST_TEST( test_attr("b=2", keywords( kwd("c")['=' > int_], kwd("b")['='>int_], kwd("a")['='>int_]), data, space ));
       BOOST_TEST( boost::fusion::at_c<0>(data) == 0);
       BOOST_TEST( boost::fusion::at_c<1>(data) == 2);
    }
-#if 0
   {
         boost::fusion::vector<int,short,double> data;
         BOOST_TEST( test_attr("d=1.4", keywords( kwd("c")[ '=' >> int_], kwd("a")[ '3'], kwd("b")['='>short_],kwd("d")['=' > double_], kwd("f")['a']) ,data, space ));
@@ -87,29 +86,29 @@ main()
 }
   {
         boost::fusion::vector<int,short,double> data;
-        BOOST_TEST( test_attr("c=1 b=43", lit("c")->*( '=' >> int_) || lit("a")->*( '3') || lit("b")->*('='>short_) || lit("d")->*('=' > double_) || lit("f")->*('a') ,data, space ));
+        BOOST_TEST( test_attr("c=1 b=43", keywords(kwd("c")[ '=' >> int_], kwd("a")[ '3'], kwd("b")['='>short_], kwd("d")['=' > double_], kwd("f")['a']) ,data, space ));
         BOOST_TEST( boost::fusion::at_c<0>(data)==1);
         BOOST_TEST( boost::fusion::at_c<1>(data)==43);
         BOOST_TEST( boost::fusion::at_c<2>(data)==0);
 }
   {
         boost::fusion::vector<int,short,double> data;
-        BOOST_TEST( test_attr("a3 fa", lit("c")->*( '=' >> int_) || lit("a")->*( '3') || lit("b")->*('='>short_) || lit("d")->*('=' > double_) || lit("f")->*('a') ,data, space ));
+        BOOST_TEST( test_attr("a3 fa", keywords( kwd("c")[ '=' >> int_],kwd("a")[ '3'], kwd("b")['='>short_], kwd("d")['=' > double_], kwd("f")['a']) ,data, space ));
         BOOST_TEST( boost::fusion::at_c<0>(data)==0);
         BOOST_TEST( boost::fusion::at_c<1>(data)==0);
         BOOST_TEST( boost::fusion::at_c<2>(data)==0);
 }
   {
         boost::fusion::vector<int,short,double> data;
-        BOOST_TEST( test_attr("a3 fa", kwd("c")[ '=' >> int_] || kwd("a")[ '3' ] || kwd("b")['='>short_] || kwd("d")['=' > double_] || kwd("f")['a'],data, space ));
+        BOOST_TEST( test_attr("a3 fa", keywords( kwd("c")[ '=' >> int_], kwd("a")[ '3' ], kwd("b")['='>short_], kwd("d")['=' > double_], kwd("f")['a']),data, space ));
         BOOST_TEST( boost::fusion::at_c<0>(data)==0);
         BOOST_TEST( boost::fusion::at_c<1>(data)==0);
         BOOST_TEST( boost::fusion::at_c<2>(data)==0);
 }
 
-        BOOST_TEST( test("a=a c=1", kwd("a")[ '=' > char_] || kwd("b")[ '=' > char_] || kwd("c")['=' > int_], space));
+        BOOST_TEST( test("a=a c=1", keywords(kwd("a")[ '=' > char_], kwd("b")[ '=' > char_], kwd("c")['=' > int_]), space));
 
-        BOOST_TEST( test("", kwd("a")[ '=' > char_] || kwd("b")[ '=' > char_] || kwd("c")['=' > int_], space));
+        BOOST_TEST( test("", keywords( kwd("a")[ '=' > char_], kwd("b")[ '=' > char_], kwd("c")['=' > int_]), space));
 #if 0
         // Exact
         BOOST_TEST(test("a=a b=b c=1", kwd("a",1)[ '=' > char_] || kwd("b")[ '=' > char_] || kwd("c")['=' > int_], space));
@@ -131,7 +130,7 @@ main()
     {   // Single keyword, empty string
 //        BOOST_TEST(test(" ", lit("aad")->*(char_),space));
         // Single keyword
-        BOOST_TEST(test("aad E ", lit("aad")->*(char_),space));
+        BOOST_TEST(test("aad E ", kwd("aad")[char_],space));
         // Single no case keyword
     //    BOOST_TEST(test("AaD E ", ikwd("aad")[char_],space));
 
@@ -140,7 +139,7 @@ main()
     {
         // Vector container
         boost::fusion::vector<std::vector<int>,std::vector<int>,std::vector<int> > data;
-        BOOST_TEST(test_attr(" a=1 b=2 b=5 c=3",kwd("a")[ '=' > int_] || kwd("b")[ '=' > int_] || kwd("c")['=' > int_] , data, space)
+        BOOST_TEST(test_attr(" a=1 b=2 b=5 c=3",keywords( kwd("a")[ '=' > int_] , kwd("b")[ '=' > int_] , kwd("c")['=' > int_]) , data, space)
                     && (boost::fusion::at_c<0>(data).size()==1)
                     && (boost::fusion::at_c<0>(data)[0]==1)
 
@@ -286,7 +285,6 @@ main()
 //        x_attr x;
 //        test_attr("a = b c = d", kwd("a")['=' > char_] || kwd("c")['=' > char_], x);
     }
-#endif
 #endif
    return boost::report_errors();
 }
